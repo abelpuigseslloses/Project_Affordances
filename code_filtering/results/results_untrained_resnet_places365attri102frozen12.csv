@@ -1,0 +1,2 @@
+model_loss,model_acc,average_precision,average_recall,average_f1
+0.7005,0.49,0.1,0.53,0.13
