@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="8236093d-2abc-413a-9960-94a7f4c34786" name="fs4.das4.science.uva.nl">
+        <fileTransfer accessType="SFTP" host="fs4.das4.science.uva.nl" port="22" sshConfigId="729b0a80-d2b4-4cf9-acd3-64f3228cc337" sshConfig="apuigses@fs4.das4.science.uva.nl:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>

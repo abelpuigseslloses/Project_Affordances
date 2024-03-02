@@ -2,11 +2,10 @@
 
 from utils import SunDataset, get_model, accuracy_fn, set_seeds
 import torch
-from get_data import make_datasets,apply_transforms, make_dataloaders
-from torchinfo import summary
+from old_no_filter.get_data import make_datasets,apply_transforms, make_dataloaders
 from torch import nn
 import torch.optim as optim
-from train_model import train_model, test_model
+from old_no_filter.train_model import train_model, test_model
 import argparse
 import os
 
@@ -122,10 +121,10 @@ def main():
 
     if host == 'local':
         # Get image paths and labels (scores for each image):
-        im_label_path = 'C:/Users/abelp/Desktop/Project_Affordance/Project_Affordances/data/images.mat'
+        im_label_path = '/data/images.mat'
         im_path = 'C:/Users/abelp/Desktop/Research_Project/SUNAttributeDB_Images/images'
-        label_path = 'C:/Users/abelp/Desktop/Project_Affordance/Project_Affordances/data/attributeLabels_continuous.mat'
-        attribute_names_path = 'C:/Users/abelp/Desktop/Project_Affordance/Project_Affordances/data/attributes.mat'
+        label_path = '/data/attributeLabels_continuous.mat'
+        attribute_names_path = '/data/attributes.mat'
 
     else:
         # Get image paths and labels (scores for each image):
@@ -138,6 +137,7 @@ def main():
     dataset = SunDataset(im_label_path, im_path, label_path, attribute_names_path, num_attributes) # hyperparameter
     class_names = dataset.attribute_names
     # print(class_names)
+    print(dataset.labels_pre)
 
     # Create training and testing datasets
     train_dataset, test_dataset = make_datasets(dataset=dataset,
@@ -167,12 +167,12 @@ def main():
     if model_weights_path is not None:
         model.load_state_dict(torch.load(model_weights_path))
 
-    print(summary(model=model,
-            input_size=(1,3,224,224),
-            verbose=0,
-            col_names=["input_size", "output_size", "num_params", "trainable"],
-            col_width=20,
-            row_settings=["var_names"]))
+    # print(summary(model=model,
+    #         input_size=(1,3,224,224),
+    #         verbose=0,
+    #         col_names=["input_size", "output_size", "num_params", "trainable"],
+    #         col_width=20,
+    #         row_settings=["var_names"]))
 
     # Setup loss function
     loss_fn = nn.BCELoss()

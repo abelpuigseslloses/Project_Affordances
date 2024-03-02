@@ -20,6 +20,7 @@ class SunDataset(object):
         labels_load = loadmat(label_path)
         labels = labels_load['labels_cv']
         # self.labels = (labels > 0).astype(int) # change this
+        self.labels_pre = labels
         self.labels = (labels[:, :num_classes] > 0).astype(int)
 
         # Attribute names
