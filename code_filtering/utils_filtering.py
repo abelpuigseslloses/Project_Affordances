@@ -9,7 +9,8 @@ from net2brain.architectures.implemented_models import places365_net
 from net2brain.architectures.implemented_models.places365_net import Lambda
 from torch import nn
 import numpy as np
-import torch.nn.functional as F
+from torchvision.models import resnet50
+from torchvision.models.resnet import ResNet50_Weights
 
 class SunDataset(object):
     def __init__(self, im_label_path, im_path, label_path, attribute_names_path, num_classes = 102, transform=None):
@@ -59,11 +60,11 @@ class SunDataset(object):
     def __len__(self):
         return len(self.imgs)
 
-def get_model(model_name, device, frozen_layers=0, num_attributes=102):
+def get_model(model_name, device, frozen_layers, num_attributes):
     if model_name == 'resnet_places365':
         # Instantiate a new model
         model = places365_net.get_resnet50_places365(pretrained=True).to(device)
-        # Freeze all the parameters
+        # Freeze the specified parameters
         if frozen_layers != 0:
             for i in range(frozen_layers):
                 for param in model.model[i].parameters():
@@ -75,6 +76,26 @@ def get_model(model_name, device, frozen_layers=0, num_attributes=102):
             nn.Linear(num_ftrs, num_attributes),  # (2048, 102)
             nn.Sigmoid()  # add a sigmoid (not necessary to do here)
         )
+
+    elif model_name == 'resnet_imagenet':
+        # Instantiate a new model
+        weights = ResNet50_Weights.DEFAULT
+        model = resnet50(weights=weights)  # Trained for ImageNet object classification
+
+        # Freeze all the parameters
+        if frozen_layers != 0:
+            p_count = 0
+            for param in model.parameters():
+                p_count += 1
+                if p_count < frozen_layers: # frozen layers: from 0 (no freeze) to 161 (full freeze)
+                    param.requires_grad = False
+
+        # Change the head of the model
+        num_ftrs = 2048
+        model.fc = nn.Sequential(
+         nn.Linear(in_features=num_ftrs, out_features=102),
+         nn.Sigmoid()) # We include Sigmoid here --> output will be a tensor with probs from 0 (absence) to 1 (presence)
+
     return model
 
 def save_model(model: torch.nn.Module,

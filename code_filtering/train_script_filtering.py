@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from utils_filtering import SunDataset, get_model, accuracy_fn, set_seeds
+from utils_filtering import SunDataset, get_model, accuracy_fn, set_seeds, save_model
 import torch
 from get_data import make_datasets,apply_transforms, make_dataloaders
 from torchinfo import summary
@@ -31,7 +31,7 @@ def main():
     parser.add_argument('--model_name',
                         default='resnet_places365',
                         type=str,
-                        help="Use 'resnet_places' or 'resnet_objects'")
+                        help="Use 'resnet_places365' or 'resnet_imagenet'")
 
     # Get an arg for num_attributes
     parser.add_argument("--num_attributes",
@@ -43,7 +43,7 @@ def main():
     parser.add_argument("--frozen_layers",
                         default=12,
                         type=int,
-                        help="the number of layers to freeze (from 0 to 12 for resnet-places365)")
+                        help="the number of layers to freeze (from 0 to 12 for resnet-places365; from 0 to 161 for resnet-alexnet")
 
     # Get an arg for loading weights of trained model
     parser.add_argument('--model_weights_path',
@@ -160,12 +160,12 @@ def main():
     if model_weights_path is not None:
         model.load_state_dict(torch.load(model_weights_path))
 
-    # print(summary(model=model,
-    #         input_size=(1,3,224,224),
-    #         verbose=0,
-    #         col_names=["input_size", "output_size", "num_params", "trainable"],
-    #         col_width=20,
-    #         row_settings=["var_names"]))
+    print(summary(model=model,
+            input_size=(1,3,224,224),
+            verbose=0,
+            col_names=["input_size", "output_size", "num_params", "trainable"],
+            col_width=20,
+            row_settings=["var_names"]))
 
     # Setup loss_fn
     loss_fn = nn.BCELoss()
@@ -190,9 +190,12 @@ def main():
         print(f"Results of training: {results}")
 
         # Save model
-        # model_file_path = f'{folder_path}/{model_name}attri{num_attributes}frozen{frozen_layers}.pth'
+        model_file_path = f'{folder_path}/{model_name}attri{num_attributes}frozen{frozen_layers}.pth'
         # print(f"Saving model to {model_file_path}")
         # torch.save(model.state_dict(), model_file_path)
+        save_model(model=model,
+                   target_dir=folder_path,
+                   model_file_path=model_file_path)
 
 
     # Evaluate the model
