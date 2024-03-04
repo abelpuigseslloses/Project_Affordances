@@ -15,7 +15,6 @@ import pandas as pd
 # scheduler
 # experiment tracking
 
-
 def main():
 
     # Create a parser
@@ -64,7 +63,7 @@ def main():
 
     # Get an arg for num_epochs
     parser.add_argument("--num_epochs",
-                        default=5,
+                        default=2,
                         type=int,
                         help="the number of epochs to train for")
 
@@ -100,6 +99,9 @@ def main():
     batch_size = args.batch_size
     learning_rate = args.learning_rate
     host = args.host
+
+
+
 
     # Folder to save models
     folder_path = 'saved_models'
@@ -179,24 +181,42 @@ def main():
             optimizer = optim.Adam(model.parameters(), lr=0.001)
 
         # Train the model and store the results
-        results = train_model(model=model,
-                              train_loader=train_loader,
-                              loss_fn=loss_fn,
-                              optimizer=optimizer,
-                              accuracy_fn=accuracy_fn,
-                              device=device,
-                              num_epochs=num_epochs)
+        results, results_precision = train_model(model=model,
+                                     train_loader=train_loader,
+                                     loss_fn=loss_fn,
+                                     optimizer=optimizer,
+                                     accuracy_fn=accuracy_fn,
+                                     device=device,
+                                     num_epochs=num_epochs)
         # Print out
         print(f"Results of training: {results}")
 
+        # Convert to dataframe
+        main_results_df = pd.DataFrame([results])
+        precision_class_results_df = pd.DataFrame(results_precision)
+
+        # Save the results
+        folder_path_results = 'results/training'
+
+        if not os.path.exists(folder_path_results):
+            os.makedirs(folder_path_results)
+            print(f"Directory '{folder_path_results}' created")
+        else:
+            print(f"Directory '{folder_path_results}' already exists")
+
+        main_results_path = os.path.join(folder_path_results,
+                                         f"training_results_{model_name}attri{num_attributes}frozen{frozen_layers}.csv")
+        precision_class_results_path = os.path.join(folder_path_results,
+                                                    f"training_precision_{model_name}attri{num_attributes}frozen{frozen_layers}.csv")
+        main_results_df.to_csv(main_results_path, index=False)
+        precision_class_results_df.to_csv(precision_class_results_path, index=False)
+
         # Save model
-        model_file_path = f'{folder_path}/{model_name}attri{num_attributes}frozen{frozen_layers}.pth'
-        # print(f"Saving model to {model_file_path}")
+        model_name = f'{model_name}attri{num_attributes}frozen{frozen_layers}.pth'
         # torch.save(model.state_dict(), model_file_path)
         save_model(model=model,
                    target_dir=folder_path,
-                   model_file_path=model_file_path)
-
+                   model_name=model_name)
 
     # Evaluate the model
     if command == 'eval':
@@ -213,7 +233,7 @@ def main():
         precision_class_results_df = pd.DataFrame(results_precision)
 
         # Specify the folder path for saving the results
-        folder_path_results = 'results'
+        folder_path_results = 'results/testing'
         if not os.path.exists(folder_path_results):
             os.makedirs(folder_path_results)
             print(f"Directory '{folder_path_results}' created")

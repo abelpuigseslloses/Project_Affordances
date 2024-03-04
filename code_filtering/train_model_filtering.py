@@ -98,6 +98,8 @@ def train_step(model: torch.nn.Module,
         # F1
         train_f1 += f1_score(labels_np_masked, final_output_np_masked, zero_division=1)
 
+        if batch % 2 == 0:
+            break
         # Print out info. every 50 batches
         if batch % 50 == 0:
             print(
@@ -134,6 +136,8 @@ def train_model(model, train_loader, loss_fn, optimizer, accuracy_fn, device=dev
 
     results = {metric: [] for metric in metric_names}
 
+    results_precision = {"class_precision": []}
+
     for epoch in tqdm(range(num_epochs)):
         print(f"Epoch nº {epoch}")
         print("-" * 10)
@@ -151,6 +155,8 @@ def train_model(model, train_loader, loss_fn, optimizer, accuracy_fn, device=dev
             print(f"{metric_name}: {metric_value}", end=" | ")
         print()
 
+        results_precision["class_precision"].append(class_precision)
+
     # Stop the timer and calculate elapsed time
     time_end = time.time()
     time_elapsed = time_end - time_start
@@ -158,7 +164,7 @@ def train_model(model, train_loader, loss_fn, optimizer, accuracy_fn, device=dev
     # Print out time elapsed
     print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
 
-    return results
+    return results, results_precision
 
 
 def test_model(model, test_loader, loss_fn, accuracy_fn, num_classes = 102, device=device):
