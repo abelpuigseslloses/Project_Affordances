@@ -10,10 +10,14 @@ from net2brain.architectures.implemented_models.places365_net import Lambda
 from torch import nn
 import numpy as np
 from torchvision.models import resnet50
-from torchvision.models.resnet import ResNet50_Weights
+import matplotlib.pyplot as plt
+import wandb
+import pandas as pd
+
+# if torchvision is updated: then from torchvision.models.resnet import ResNet50_Weights
 
 class SunDataset(object):
-    def __init__(self, im_label_path, im_path, label_path, attribute_names_path, num_classes = 102, transform=None):
+    def __init__(self, im_label_path, im_path, label_path, attribute_names_path, num_attributes, transform=None):
         # Images
         images = loadmat(im_label_path)
         im_list = [list(images['images'][i][0])[0] for i in range(len(images['images']))]
@@ -26,15 +30,12 @@ class SunDataset(object):
         ambiguous_mask = np.isclose(labels, 1 / 3)
         labels[ambiguous_mask] = -1
         labels[labels > 0] = 1
-        self.labels = labels
+        self.labels = labels[:, :num_attributes]  # Trim the scores for each label based on num_classes (e.g., only first 36)
 
         # Attribute names
         attribute_names = loadmat(attribute_names_path)
         self.attribute_names = [str(attribute[0][0]) for attribute in attribute_names['attributes']]
-
-        # Trim the attribute names list based on num_classes
-        if num_classes > 0:  # Assuming num_classes should always be positive
-            self.attribute_names = self.attribute_names[:num_classes]
+        self.attribute_names = self.attribute_names[:num_attributes]  # Trim the attribute names list based on num_classes
 
         # Transforms
         self.transform = transform
@@ -78,29 +79,28 @@ def get_model(model_name, device, frozen_layers, num_attributes):
         )
 
     elif model_name == 'resnet_imagenet':
+        pass
         # Instantiate a new model
-        weights = ResNet50_Weights.DEFAULT
-        model = resnet50(weights=weights)  # Trained for ImageNet object classification
+        # weights = ResNet50_Weights.DEFAULT
+        # model = resnet50(weights=weights)  # Trained for ImageNet object classification
+        #
+        # # Freeze all the parameters
+        # if frozen_layers != 0:
+        #     p_count = 0
+        #     for param in model.parameters():
+        #         p_count += 1
+        #         if p_count < frozen_layers: # frozen layers: from 0 (no freeze) to 161 (full freeze)
+        #             param.requires_grad = False
 
-        # Freeze all the parameters
-        if frozen_layers != 0:
-            p_count = 0
-            for param in model.parameters():
-                p_count += 1
-                if p_count < frozen_layers: # frozen layers: from 0 (no freeze) to 161 (full freeze)
-                    param.requires_grad = False
-
-        # Change the head of the model
-        num_ftrs = 2048
-        model.fc = nn.Sequential(
-         nn.Linear(in_features=num_ftrs, out_features=102),
-         nn.Sigmoid()) # We include Sigmoid here --> output will be a tensor with probs from 0 (absence) to 1 (presence)
+        # # Change the head of the model
+        # num_ftrs = 2048
+        # model.fc = nn.Sequential(
+        #  nn.Linear(in_features=num_ftrs, out_features=102),
+        #  nn.Sigmoid()) # We include Sigmoid here --> output will be a tensor with probs from 0 (absence) to 1 (presence)
 
     return model
 
-def save_model(model: torch.nn.Module,
-               target_dir: str,
-               model_name: str):
+def save_model(model, target_dir, model_name):
     """Saves a PyTorch model to a target directory.
 
     Args:
@@ -158,3 +158,62 @@ def accuracy_fn(final_output, labels):
     batch_acc = correct_preds.float() / torch.tensor(total_preds).float()
 
     return batch_acc
+
+
+def plot_class_precision(class_precision, class_names, epoch, target_dir):
+    """Plots class precision per attribute"""
+    assert len(class_precision) == len(class_names), "class_precision and class_names must be the same length"
+
+    plt.figure(figsize=(20, 10))  # Adjust the figure size as needed
+    plt.bar(class_names, class_precision, color='skyblue')  # Create a bar chart
+    plt.xlabel('Class Name')  # Label for the x-axis
+    plt.ylabel('Precision Score')  # Label for the y-axis
+    plt.title('Class Precision Scores')  # Title of the plot
+    plt.xticks(rotation=90)  # Rotate class names for better visibility if needed
+    plt.ylim(-0.1, 1)
+    plt.grid(axis='y')  # Add horizontal grid lines for better readability
+
+    plt.tight_layout()  # Adjust subplot parameters to give specified padding
+
+    if epoch is not None:
+        filename = f'precision_epoch_{epoch}.png'
+    else:
+        filename = 'precision_epoch_0.png'
+
+    plot_path = os.path.join(target_dir, filename)
+
+    # After generating plot and defining path, save it using:
+    plt.savefig(plot_path)
+    plt.close()  # Close the plot to free up memory
+
+    if epoch is not None:
+        wandb.log({f"Class Precision Scores Epoch {epoch}": [wandb.Image(plot_path, caption=f"Epoch {epoch}")]})
+    else:
+        wandb.log({f"Evaluation - Class Precision Scores": [wandb.Image(plot_path, caption="Evaluation")]})
+
+def save_results(results, results_precision, model_name, target_dir):
+
+    # Make a pandas df
+    main_results_df = pd.DataFrame([results])
+
+    if not isinstance(results_precision, dict):
+        results_precision = results_precision.to("cpu")
+
+    precision_class_results_df = pd.DataFrame(results_precision)
+
+    # Make directories
+    precision_dir = Path(os.path.join(target_dir, 'precision'))
+    precision_dir.mkdir(parents=True,
+                        exist_ok=True)
+
+    main_dir = Path(os.path.join(target_dir, 'main'))
+    main_dir.mkdir(parents=True,
+                        exist_ok=True)
+
+    # Main results
+    main_results_path = Path(os.path.join(main_dir, f"results_{model_name}.csv"))
+    main_results_df.to_csv(main_results_path, index=False)
+
+    # Precision per class results
+    precision_class_results_path = Path(os.path.join(precision_dir, f"precision_{model_name}.csv"))
+    precision_class_results_df.to_csv(precision_class_results_path, index=False)

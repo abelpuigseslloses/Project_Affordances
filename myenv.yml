@@ -14,4 +14,4 @@ dependencies:
   - pytorch==1.12.1
   - torchvision==0.13.1
   - cudatoolkit=10.2
-prefix: C:\Users\abelp\miniconda3\envs\myenv
+prefix: /home/apuigses/workspace/myenv

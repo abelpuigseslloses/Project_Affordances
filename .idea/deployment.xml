@@ -1,15 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" serverName="fs4.das4.science.uva.nl" remoteFilesAllowedToDisappearOnAutoupload="false" confirmBeforeUploading="false">
+  <component name="PublishConfigData" autoUpload="On explicit save action" serverName="fs4.das4.science.uva.nl" confirmBeforeUploading="false" autoUploadExternalChanges="true" showNewOnSourceInSync="false">
     <option name="confirmBeforeUploading" value="false" />
     <serverData>
       <paths name="fs4.das4.science.uva.nl">
         <serverdata>
           <mappings>
-            <mapping deploy="/home/apuigses/workspace/code" local="$PROJECT_DIR$" web="" />
+            <mapping deploy="/var/scratch/apuigses/code/code_filtering" local="$PROJECT_DIR$/code_filtering" />
           </mappings>
         </serverdata>
       </paths>
     </serverData>
+    <option name="myAutoUpload" value="ON_EXPLICIT_SAVE" />
   </component>
 </project>

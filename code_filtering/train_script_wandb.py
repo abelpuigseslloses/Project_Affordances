@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 
-from utils_filtering import SunDataset, get_model, accuracy_fn, set_seeds, save_model
+from utils_filtering import SunDataset, get_model, set_seeds, save_model, save_results, plot_class_precision
 import torch
 from get_data import make_datasets,apply_transforms, make_dataloaders
-from torchinfo import summary
+
+from pathlib import Path
 from torch import nn
 import torch.optim as optim
 from train_model_wandb import train_model, test_model
 import argparse
 import os
-import pandas as pd
 import wandb
+import numpy as np
 
+## to visualize I can import from torchinfo import summary (needs install on server)
 
-### TO DO:
-# scheduler
-# experiment tracking
+## add a scheduler?
 
 def main():
 
@@ -26,7 +26,7 @@ def main():
 
     # Get an arg for the command
     parser.add_argument('--command',
-                        default='train',
+                        default='eval',
                         type=str,
                         help="'train' or 'eval'")
 
@@ -38,7 +38,7 @@ def main():
 
     # Get an arg for num_attributes
     parser.add_argument("--num_attributes",
-                        default=102,
+                        default=36,
                         type=int,
                         help="the number of attributes to train on")
 
@@ -67,7 +67,7 @@ def main():
 
     # Get an arg for num_epochs
     parser.add_argument("--num_epochs",
-                        default=1,
+                        default=7,
                         type=int,
                         help="the number of epochs to train for")
 
@@ -85,7 +85,7 @@ def main():
 
     # Get an arg for where it is run
     parser.add_argument('--host',
-                        default='local',
+                        default='server',
                         type=str,
                         help="'local' or 'server'")
 
@@ -125,22 +125,22 @@ def main():
     host = config.host
 
     # Folder to save models
-    folder_path = 'saved_models'
-    if not os.path.exists(folder_path):
-        os.makedirs(folder_path)
-        print(f"Directory '{folder_path}' created")
+    models_folder_path = 'saved_models'
+    if not os.path.exists(models_folder_path):
+        os.makedirs(models_folder_path)
+        print(f"Directory '{models_folder_path}' created")
     else:
-        print(f"Directory '{folder_path}' already exists")
+        print(f"Directory '{models_folder_path}' already exists")
 
     # Check if run is local or server
     if host == 'local':
         base_path = 'C:/Users/abelp/Desktop/Project_Affordance/Project_Affordances/data'
     else:
-        base_path = '/home/apuigses/workspace/data/'
+        base_path = '/var/scratch/apuigses/data'
 
     # Get image paths and labels (scores for each image):
-    im_label_path = os.path.join(base_path, 'images.mat' )
-    im_path = os.path.join(base_path, 'images' )
+    im_label_path = os.path.join(base_path, 'images.mat')
+    im_path = os.path.join(base_path, 'images')
     label_path = os.path.join(base_path, 'attributeLabels_continuous.mat')
     attribute_names_path = os.path.join(base_path, 'attributes.mat')
 
@@ -152,11 +152,10 @@ def main():
     # print(img_tmp.shape, label_tmp.shape)
     # print(label_tmp)
 
-
     # Create training and testing datasets
     train_dataset, test_dataset = make_datasets(dataset=dataset,
                                                 test_size=test_size) # 10%
-    # print(test_dataset[0][0].shape) # torch.Size([3, 400, 400])
+    print(test_dataset[0][1].shape) # torch.Size([3, 400, 400])
 
     # Apply transforms to datasets
     apply_transforms(train_dataset.dataset)
@@ -168,7 +167,7 @@ def main():
 
     # Setup device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    #print(device)
+    print("Device:", device)
     #set_seeds() # to control randomness
 
     # Setup model
@@ -177,98 +176,118 @@ def main():
                       frozen_layers=frozen_layers,
                       num_attributes=num_attributes)
 
+    model_name = f'{model_name}attri{num_attributes}frozen{frozen_layers}'
+
     # Load weights
     if model_weights_path is not None:
-        model.load_state_dict(torch.load(model_weights_path))
+        model.load_state_dict(torch.load(model_weights_path, map_location=torch.device(device)))
 
-    print(summary(model=model,
-            input_size=(1,3,224,224),
-            verbose=0,
-            col_names=["input_size", "output_size", "num_params", "trainable"],
-            col_width=20,
-            row_settings=["var_names"]))
+    # For visualization:
+    # print(summary(model=model,
+    #         input_size=(1,3,224,224),
+    #         verbose=0,
+    #         col_names=["input_size", "output_size", "num_params", "trainable"],
+    #         col_width=20,
+    #         row_settings=["var_names"]))
 
     # Setup loss_fn
     loss_fn = nn.BCELoss()
 
     # Train model
     if command == 'train':
+
+        train_path = Path('results/training')
+        train_path.mkdir(parents=True,
+                          exist_ok=True)
+
+        test_path = Path('results/testing')
+        test_path.mkdir(parents=True,
+                         exist_ok=True)
+
+        train_model_path = Path(os.path.join(train_path, model_name))
+        train_model_path.mkdir(parents=True,
+                         exist_ok=True)
+
+        test_model_path = Path(os.path.join(test_path, model_name))
+        test_model_path.mkdir(parents=True,
+                              exist_ok=True)
+
         # Set up optimizer
         if optimizer == 'SGD':
             optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
         else:
             optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-        # Train the model and store the results
-        results, results_precision = train_model(model=model,
-                                     train_loader=train_loader,
-                                     loss_fn=loss_fn,
-                                     optimizer=optimizer,
-                                     accuracy_fn=accuracy_fn,
-                                     device=device,
-                                     num_epochs=num_epochs)
+        # Train the model (while also testing) and store the results
+        train_results, test_results, train_results_precision, test_results_precision = train_model(model=model,
+                                                                                       train_loader=train_loader,
+                                                                                       test_loader=test_loader,
+                                                                                       loss_fn=loss_fn,
+                                                                                       optimizer=optimizer,
+                                                                                       device=device,
+                                                                                       num_epochs=num_epochs,
+                                                                                       class_names=class_names,
+                                                                                       num_attributes=num_attributes,
+                                                                                       model_name=model_name,
+                                                                                       test_model_path=test_model_path,
+                                                                                       train_model_path=train_model_path)
+
         # Print out
-        print(f"Results of training: {results}")
+        print(f"Results of training: {train_results}")
 
-        # Convert to dataframe
-        main_results_df = pd.DataFrame([results])
-        precision_class_results_df = pd.DataFrame(results_precision)
+        # Store, save the results
+        save_results(results=train_results,
+                     results_precision=train_results_precision,
+                     model_name=model_name,
+                     target_dir=train_model_path)
 
-        # Save the results
-        folder_path_results = 'results/training'
-
-        if not os.path.exists(folder_path_results):
-            os.makedirs(folder_path_results)
-            print(f"Directory '{folder_path_results}' created")
-        else:
-            print(f"Directory '{folder_path_results}' already exists")
-
-        main_results_path = os.path.join(folder_path_results,
-                                         f"training_results_{model_name}attri{num_attributes}frozen{frozen_layers}.csv")
-        precision_class_results_path = os.path.join(folder_path_results,
-                                                    f"training_precision_{model_name}attri{num_attributes}frozen{frozen_layers}.csv")
-        main_results_df.to_csv(main_results_path, index=False)
-        precision_class_results_df.to_csv(precision_class_results_path, index=False)
+        save_results(results=test_results,
+                     results_precision=test_results_precision,
+                     model_name=model_name,
+                     target_dir=test_model_path)
 
         # Save model
-        model_name = f'{model_name}attri{num_attributes}frozen{frozen_layers}.pth'
-        # torch.save(model.state_dict(), model_file_path)
         save_model(model=model,
-                   target_dir=folder_path,
-                   model_name=model_name)
+                   target_dir=models_folder_path,
+                   model_name=model_name + '.pth')
 
     # Evaluate the model
-    if command == 'eval':
+    elif command == 'eval':
+
+        # Create a path to the model
+        eval_path = Path('eval_results')
+        eval_path.mkdir(parents=True,
+                        exist_ok=True)
+
+        model_path = os.path.join(eval_path, model_name)
+        model_path = Path(model_path)
+        model_path.mkdir(parents=True,
+                         exist_ok=True)
+
+        # Test the model
         results_eval, results_precision = test_model(model=model,
-                                          test_loader=test_loader,
+                                          dataloader=test_loader,
                                           loss_fn=loss_fn,
-                                          accuracy_fn=accuracy_fn,
+                                          print_time_eval=True,
+                                          num_attributes=num_attributes,
                                           device=device)
+
         # Print out
         print("Results of evaluation:", results_eval)
 
-        # Make a pandas df
-        main_results_df = pd.DataFrame([results_eval])
-        precision_class_results_df = pd.DataFrame(results_precision)
+        # Store, save the results
+        save_results(results=results_eval,
+                     results_precision=results_precision,
+                     model_name=model_name,
+                     target_dir=model_path)
 
-        # Specify the folder path for saving the results
-        folder_path_results = 'results/testing'
-        if not os.path.exists(folder_path_results):
-            os.makedirs(folder_path_results)
-            print(f"Directory '{folder_path_results}' created")
-        else:
-            print(f"Directory '{folder_path_results}' already exists")
+        # Plot and export precision to wandb
+        eval_clean_class_precision = [-0.1 if np.isnan(prec) else prec for prec in results_precision.to("cpu").numpy()] # Prepare precision scores. Indicate the nan with negative bar
 
-        # Define file paths for saving the CSV files
-        if model_weights_path != None:
-            pretraining = 'trained'
-        else:
-            pretraining = 'untrained'
-
-        main_results_path = os.path.join(folder_path_results, f"results_{pretraining}_{model_name}attri{num_attributes}frozen{frozen_layers}.csv")
-        precision_class_results_path = os.path.join(folder_path_results, f"precision_{pretraining}_{model_name}attri{num_attributes}frozen{frozen_layers}.csv")
-        main_results_df.to_csv(main_results_path, index=False)
-        precision_class_results_df.to_csv(precision_class_results_path, index=False)
+        plot_class_precision(class_precision=eval_clean_class_precision,
+                             class_names=class_names,
+                             epoch=None, # epoch not applicable during evaluation test
+                             target_dir=model_path)
 
     wandb.finish()
 
