@@ -1,0 +1,19 @@
+program: main_script.py
+method: random # Choose between "grid", "random", "bayes", etc.
+project: Prova
+entity: abelpuigseslloses
+metric:
+  name: test_loss
+  goal: minimize
+parameters:
+  model_name:
+    values: ["resnet_places365"]
+  type_attributes:
+    values: ["affordances"]
+  learning_rate:
+    min: 0.0001
+    max: 0.001
+  optimizer:
+    values: ["adam"]
+
+
