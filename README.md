@@ -8,7 +8,7 @@ In this repo, we can find:
 
 *utils.py*: get useful functions for training (creates the Dataset, gets the model, dataloaders, apply data transforms, set the seeds, etc.)
 
-*data*: The files that make up the dataset are:
+*data*: The files that make up the dataset are the following (Patterson et al., 2014):
 
 -attributes.mat: A cell array containing all of the 102 attribute words 
 
