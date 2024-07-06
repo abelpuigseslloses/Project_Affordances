@@ -1,15 +1,12 @@
 **PROJECT AFFORDANCES**
 
-**2 main folders**: code_filtering and old_no_filter. 
-Filtering indicates that all attributes with 1 vote are excluded, not taken into account for training the model. This is because 1 single vote is in between absence and presence, it is ambiguous so it's preferable to leave out, as in Patterson et al. Therefore, in the code of *code_filtering* folder I do this, while in the *old_no_filter* folder I do not exclude any attribute.
+In this repo, we can find:
 
-In each folder, we can find:
+*main_script.py*: run it to train the model. Set parameters either in argparse or as part of a sweep.
 
-*train_script.py*: run it to train/evaluate the model
+*train_eval.py*: the main script calls this function to train the model while testing on the validation set.
 
-*utils.py*: get the Dataset, get the model, set the seeds, get the custom accuracy function
-
-*get_data.py*: Make the training and testing datasets, dataloaders, apply data transforms.
+*utils.py*: get useful functions for training (creates the Dataset, gets the model, dataloaders, apply data transforms, set the seeds, etc.)
 
 *data*: The files that make up the dataset are:
 
